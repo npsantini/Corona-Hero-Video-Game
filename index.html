@@ -1,0 +1,516 @@
+<!doctype html> 
+<html lang="en"> 
+<head> 
+    <meta charset="UTF-8" />
+    <title>CORONAVIRUS - A game by Nick Santini</title>
+    <link rel="stylesheet" href="style.css">
+    <script
+  src="https://code.jquery.com/jquery-3.5.1.min.js"
+  integrity="sha256-9/aliU8dGd2tb6OSsuzixeV4y/faTqgFtohetphbbj0="
+  crossorigin="anonymous"></script>
+    <script src="phaser.min.js"></script>
+    <style type="text/css">
+        body {
+            margin: 0;
+        }
+    </style>
+</head>
+<body>
+    <div id="titleScreen">
+        <button id="gameStartButton">Start</button>
+    </div>
+    <script>
+        $("#gameStartButton").on("click", function(){
+            $("#titleScreen").css("display", "none");
+        });
+    </script>
+
+<script type="text/javascript">
+    var config = {
+        type: Phaser.AUTO,
+        width: 1400,
+        height: 800,
+        physics: {
+            default: 'arcade',
+            arcade: {
+                gravity: { y: 400 },
+                debug: false
+            }
+        },
+        scene: {
+            preload: preload,
+            create: create,
+            update: update
+        }
+    };
+
+    var player;
+    var coronavirus;
+    var hasMask = 0;
+    var timeWithMask = 0;
+    var street;
+    var sidewalk;
+    var tpRolls;
+    var bombs;
+    var street;
+    var platforms;
+    var cursors;
+    var myCam;
+    var score = 0;
+    var lives = 1;
+    var gameOver = false;
+    var scoreText;
+    var liveText;
+    var lifebottles;
+    var minX = 50;
+    var maxX;
+    var levelMultiple = 1;
+    var level = 1;
+    var levelText;
+    var music;
+    var hitGroan;
+
+    var buttonjump;
+    var buttonleft;
+    var buttonright;
+
+    var left=false;
+    var right=false;
+    var jump=false;
+
+
+    var game = new Phaser.Game(config);
+
+    function preload ()
+    {
+        this.load.spritesheet('buttonvertical', 'assets/button-vertical.png',{ frameWidth: 64, frameHeight: 64 });
+        this.load.spritesheet('buttonhorizontal', 'assets/button-horizontal.png',{ frameWidth: 96, frameHeight: 64 });
+        this.load.image('bg', 'assets/bg.png');
+        this.load.image('buildings', 'assets/buildings.png');
+        this.load.image('sidewalk', 'assets/sidewalk.png');
+        this.load.image('street', 'assets/street.png');
+        this.load.image('tp', 'assets/toilet-paper.png');
+        this.load.image('mask', 'assets/mask.png');
+        this.load.image('life-bottle', 'assets/life-bottle.png');
+        this.load.image('bomb', 'assets/coronavirus.gif');
+        this.load.image('platform', 'assets/block.png');
+        this.load.spritesheet('dude', 'assets/dude.png', { frameWidth: 32, frameHeight: 48 });
+        this.load.spritesheet('dude2', 'assets/dude2.png', { frameWidth: 32, frameHeight: 48 });
+        this.load.spritesheet('coronavirus', 'assets/coronavirus-2.png', { frameWidth: 194, frameHeight: 194 });
+        this.load.audio('bg-music', 'assets/bg-music.mp3');
+        this.load.audio('groan', 'assets/groan.mp3');
+        this.load.audio('collect-item', 'assets/collect-item.mp3');
+        this.load.audio('game-over', 'assets/game-over.mp3');
+        this.load.audio('jump-noise', 'assets/jump.mp3');
+        this.load.audio('finish-level', 'assets/finish-level.mp3');
+        this.load.audio('mask-hit', 'assets/mask-hit.mp3');
+        this.load.audio('lost-mask', 'assets/lost-mask.mp3');
+        this.load.audio('collect-tp', 'assets/collect-tp.mp3');
+
+    }
+
+    function create ()
+    {
+        music = this.sound.add('bg-music');
+        music.setLoop(true);
+        music.setVolume(.25);
+        music.play();
+
+        hitGroan = this.sound.add('groan');
+        jumpNoise = this.sound.add('jump-noise');
+        collectItem = this.sound.add('collect-item');
+        finishLevel = this.sound.add('finish-level');
+        gameOverSound = this.sound.add('game-over');
+        maskHit = this.sound.add('mask-hit');
+        lostMask = this.sound.add('lost-mask');
+        collectTP = this.sound.add('collect-tp');
+
+        hitGroan.setVolume(.25);
+        jumpNoise.setVolume(.05);
+        collectItem.setVolume(.25);
+        finishLevel.setVolume(.25);
+        gameOverSound.setVolume(.25);
+        maskHit.setVolume(.25);
+        lostMask.setVolume(.25);
+        collectTP.setVolume(.1);
+
+        //  A simple background for our game
+        bg = this.add.tileSprite(0, 0, game.config.width, game.config.height, "bg");
+        bg.setOrigin(0, 0);
+        bg.setScrollFactor(0);
+
+        buildings = this.add.tileSprite(0, 57, game.config.width, game.config.height, "buildings");
+        buildings.setOrigin(0, 0);
+        buildings.setScrollFactor(0);
+
+        //  The street group contains the ground and the 2 ledges we can jump on
+        street = this.physics.add.staticGroup();
+        sidewalk = this.physics.add.staticGroup();
+
+        platforms = this.physics.add.staticGroup();
+        
+
+        //  Here we create the ground.
+        //  Scale it to fit the width of the game (the original sprite is 400x32 in size)
+        for (i = 0; i < game.config.width * 2; i += 128) {
+            street.create(i, 738, 'street');
+        }
+        for (i = 0; i < game.config.width * 2; i += 113) {
+            sidewalk.create(i, 685, 'sidewalk');
+        }
+        street.create(game.config.width, 738, 'street');
+        sidewalk.create(game.config.width - 7, 685, 'sidewalk');
+        sidewalk.create(game.config.width +30, 685, 'sidewalk');
+        
+
+        p0 = this.add.tileSprite(200, 550, (3 * 32), 32, "platform");
+        platforms.add(p0);
+
+        p1 = this.add.tileSprite(600, 500, (6 * 32), 32, "platform");
+        platforms.add(p1);
+
+        p2 = this.add.tileSprite(400, 600, (3 * 32), 32, "platform");
+        platforms.add(p2);
+
+        p3 = this.add.tileSprite(800, 550, (2 * 32), 32, "platform");
+        platforms.add(p3);
+
+        p4 = this.add.tileSprite(1200, 500, (3 * 32), 32, "platform");
+        platforms.add(p4);
+        //  Now let's create some ledges
+        /*street.create(600, 400, 'street');
+        street.create(50, 250, 'street');
+        street.create(750, 220, 'street');*/
+
+        // The player and its settings
+        player = this.physics.add.sprite(100, 338, 'dude');
+   
+        this.anims.create({
+            key: 'play',
+            frames: this.anims.generateFrameNumbers('coronavirus', { start: 0, end: 15 }),
+            frameRate: 30,
+            repeat: -1
+        });
+        
+        
+
+        //  Player physics properties. Give the little guy a slight bounce.
+        player.setBounce(0.2);
+        player.setCollideWorldBounds(true);
+
+        //  Our player animations, turning, walking left and walking right.
+        this.anims.create({
+            key: 'left',
+            frames: this.anims.generateFrameNumbers('dude', { start: 0, end: 3 }),
+            frameRate: 10,
+            repeat: -1
+        });
+
+        this.anims.create({
+            key: 'turn',
+            frames: [ { key: 'dude', frame: 4 } ],
+            frameRate: 20
+        });
+
+        this.anims.create({
+            key: 'right',
+            frames: this.anims.generateFrameNumbers('dude', { start: 5, end: 8 }),
+            frameRate: 10,
+            repeat: -1
+        });
+
+        //  Input Events
+        cursors = this.input.keyboard.createCursorKeys();
+
+        // set workd bounds to allow camera to follow the player
+        myCam = this.cameras.main;
+        myCam.setBounds(0, 0, game.config.width * 2, game.config.height);
+
+        // making the camera follow the player
+        myCam.startFollow(player);
+
+        //  Some stars to collect, 12 in total, evenly spaced 70 pixels apart along the x axis
+        var randomX = Math.floor(Math.random() * (+300 - +120)) + +120;
+        
+        tpRolls = this.physics.add.group({
+            key: 'tp',
+            repeat: 5,
+            setXY: { x: 12, y: 0, stepX: randomX }
+        });
+
+        tpRolls.children.iterate(function (child) {
+
+            //  Give each star a slightly different bounce
+            child.setBounceY(Phaser.Math.FloatBetween(0.1, 0.3));
+
+        });
+
+
+        lifeBottles = this.physics.add.group();
+
+
+        bombs = this.physics.add.group();
+        masks = this.physics.add.group();
+        
+
+
+        //  The score
+        scoreText = this.add.text(16, 16, 'score: 0', { fontSize: '32px', fill: '#fff' });
+        scoreText.setScrollFactor(0);
+
+        liveText = this.add.text(16, 44, 'Lives: 1', { fontSize: '32px', fill: '#fff' });
+        liveText.setScrollFactor(0);
+        
+        levelText = this.add.text(16, 72, 'Level: 1', { fontSize: '32px', fill: '#fff' });
+        levelText.setScrollFactor(0);
+
+        //  Collide the player and the stars with the street
+        this.physics.add.collider(player, street);
+        //this.physics.add.collider(player, street);
+        this.physics.add.collider(tpRolls, street);
+        //this.physics.add.collider(stars, street);
+        this.physics.add.collider(bombs, street);
+        //this.physics.add.collider(bombs, street);
+        this.physics.add.collider(lifeBottles, street);
+        this.physics.add.collider(masks, street);
+
+        this.physics.add.collider(player, platforms);
+        this.physics.add.collider(bombs, platforms);
+        this.physics.add.collider(lifeBottles, platforms);
+        this.physics.add.collider(tpRolls, platforms);
+        this.physics.add.collider(masks, platforms);
+
+        //  Checks to see if the player overlaps with any of the stars, if he does call the collectStar function
+        this.physics.add.overlap(player, tpRolls, collectStar, null, this);
+        this.physics.add.collider(player, lifeBottles, collectLife, null, this);
+        //this.physics.add.collider(player, lifeBottles, collectLifeBottle, null, this);
+        this.physics.add.collider(player, bombs, hitBomb, null, this);
+        this.physics.add.collider(player, masks, collectMask, null, this);
+    }
+
+    function update ()
+    {
+        if (gameOver)
+        {
+            return;
+        }
+
+        if (cursors.left.isDown || left)
+        {
+            player.setVelocityX(-160);
+
+            player.anims.play('left', true);
+        }
+        else if (cursors.right.isDown || right)
+        {
+            player.setVelocityX(160);
+
+            player.anims.play('right', true);
+        }
+        else
+        {
+            player.setVelocityX(0);
+
+            player.anims.play('turn');
+
+            right=false;
+            left=false;
+            jump=false;
+
+
+        }
+
+        if ((cursors.up.isDown && player.body.touching.down) || (jump && player.body.touching.down))
+        {
+            player.setVelocityY(-400);
+            jumpNoise.play();
+        }
+
+            // scroll the texture of the tilesprites proportionally to the camera scroll
+        street.tilePositionX = myCam.scrollX * .3;
+        buildings.tilePositionX = myCam.scrollX * .3;
+        bg.tilePositionX = myCam.scrollX;
+        scoreText.tilePositionX = myCam.scrollX;
+    }
+
+    
+
+    function collectStar (player, tp)
+    {
+        tp.disableBody(true, true);
+        collectTP.play();
+
+        //  Add and update the score
+        score += 10;
+        scoreText.setText('Score: ' + score);
+
+        if (tpRolls.countActive(true) === 0){
+
+            finishLevel.play();
+            //  A new batch of stars to collect
+            tpRolls.children.iterate(function (child) {
+
+                child.enableBody(true, child.x, 0, true, true);
+
+            });
+
+            var x = (player.x < 700) ? Phaser.Math.Between(700, 800) : Phaser.Math.Between(0, 400);
+
+            var bomb = this.physics.add.sprite(x, 100, 'coronavirus');
+            bombs.add(bomb);
+            //var coronaPlay = bomb.animations.add('coronaPlay');
+            bomb.anims.play('play', true);
+            //bomb.amimations.play('coronaPlay', 20, true);
+            bomb.setScale(.25);
+            bomb.setBounce(1);
+            bomb.setCollideWorldBounds(true);
+            bomb.setVelocity(Phaser.Math.Between(-200, 200), 20);
+            bomb.allowGravity = false;
+
+            updateLevel();
+
+            // Lose mask if 2 levels have passed
+            if (hasMask == 1){
+                timeWithMask++;
+                if (timeWithMask >= 2){
+                    removeMask();
+                    lostMask.play();
+                    timeWithMask = 0;
+                    hasMask = 0;
+                }
+            }
+
+            if (level % 2 == 0){
+
+                var randomX = Math.floor(Math.random() * (+1400 - +minX)) + +minX;
+                var bottle = this.physics.add.image(randomX, 100, 'life-bottle');
+                    
+                lifeBottles.add(bottle);
+                levelMultiple += 1;
+            }
+
+            if (level % 3 == 0){
+                var randomX = Math.floor(Math.random() * (+1400 - +minX)) + +minX;
+                var mask = this.physics.add.image(randomX, 100, 'mask');
+                    
+                masks.add(mask);
+                levelMultiple += 1;
+            }
+        }
+    }
+
+
+
+    function collectLife (player, life)
+    {
+        life.disableBody(true, true);
+
+        collectItem.play();
+
+        //  Add and update the score
+        lives += 1;
+        liveText.setText('Lives: ' + lives);
+    }
+
+    function collectMask(player, mask) {
+        mask.disableBody(true, true);
+        collectItem.play();
+        hasMask = 1;
+        changeMask();
+
+    }
+
+    function updateLevel (){
+        //  Add and update the score
+        level += 1;
+        levelText.setText('Level: ' + level);
+    }
+
+    function hitBomb (player, bomb){
+        bomb.disableBody(true, true);
+
+        if (hasMask == 0){
+            hitGroan.play();
+
+            lives -= 1;
+            liveText.setText('Lives: ' + lives);
+
+        } else {
+            removeMask();
+            maskHit.play();
+            player.anims.play('turn');
+        }
+
+        if (lives == 0){
+            this.physics.pause();
+
+            player.setTint(0xff0000);
+
+            player.anims.play('turn');
+
+            gameOver = true;
+
+            music.stop();
+            gameOverSound.play();
+        }
+    }
+
+    function changeMask() {
+
+        game.anims.remove('left');
+        game.anims.remove('right');
+        game.anims.remove('turn');
+        game.anims.create({
+            key: 'left',
+            frames: game.anims.generateFrameNumbers('dude2', { start: 0, end: 3 }),
+            frameRate: 10,
+            repeat: -1
+        });
+
+        game.anims.create({
+            key: 'turn',
+            frames: [ { key: 'dude2', frame: 4 } ],
+            frameRate: 20
+        });
+
+        game.anims.create({
+            key: 'right',
+            frames: game.anims.generateFrameNumbers('dude2', { start: 5, end: 8 }),
+            frameRate: 10,
+            repeat: -1
+        });
+    }
+
+
+    function removeMask() {
+        game.anims.remove('left');
+        game.anims.remove('right');
+        game.anims.remove('turn');
+        game.anims.create({
+            key: 'left',
+            frames: game.anims.generateFrameNumbers('dude', { start: 0, end: 3 }),
+            frameRate: 10,
+            repeat: -1
+        });
+
+        game.anims.create({
+            key: 'turn',
+            frames: [ { key: 'dude', frame: 4 } ],
+            frameRate: 20
+        });
+
+        game.anims.create({
+            key: 'right',
+            frames: game.anims.generateFrameNumbers('dude', { start: 5, end: 8 }),
+            frameRate: 10,
+            repeat: -1
+        });
+
+        hasMask = 0;
+    }
+
+
+</script>
+
+</body>
+</html>
